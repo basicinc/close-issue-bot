@@ -14,7 +14,7 @@ const GITHUB_BASE_URL = `https://api.github.com/repos/${GITHUB_ORG}/${GITHUB_REP
 const github_request = request.defaults({headers: {Authorization: GITHUB_TOKEN, "User-Agent": "Awesome-Octocat-App"}});
 
 function shouldSkipIssue(label) {
-  return ["upto-qa", "qa-done", "Close予定", "WIP", "release-ok"].indexOf(label) >= 0
+  return ["upto-qa", "qa-done", "Close予定", "release-ok", "本番直接反映済"].indexOf(label) >= 0
 }
 
 function shouldCloseIssue(timeline) {
@@ -31,9 +31,12 @@ function shouldCloseIssue(timeline) {
 }
 
 async function postToSlack(issues) {
-  const issueList = "```\n" + issues.map(issue => `・${issue.title} ${issue.url}`).join("\n") + "\n```"
+  let issueList = "ありません";
+  if (issues.length > 0) {
+    issueList = "```\n" + issues.map(issue => `・${issue.title} ${issue.url}`).join("\n") + "\n```";
+  }
   const text = `
-@fodev
+<@fodev>
 
 今週closeされたプルリクと来週close予定のプルリク一覧です。
 各プルリクを確認し、リリースされるように対応を進めて下さい。
@@ -61,7 +64,7 @@ async function checkIssue(page=1) {
       }
     })
     if (skip) return;
-    if (deadline < new Date(pull.created_at)) {
+    if (deadline < new Date(pull.updated_at)) {
       stop = true;
       return false;
     }
@@ -118,10 +121,10 @@ async function closeIssues(issues) {
 }
 
 async function main() {
-  const closeIssues = await prepairCloseIssue();
-  await closeIssues(closeIssues);
+  const needCloseIssues = await prepairCloseIssue();
+  await closeIssues(needCloseIssues);
   await checkIssue();
-  if (closeIssues.length > 0) await postToSlack(closeIssues);
+  await postToSlack(needCloseIssues);
   return Promise.resolve("Done");
 }
 
